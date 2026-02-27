@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Terminal Animation</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 820px;
+    height: 400px;
+    overflow: hidden;
+    background: #0d1117;
+    font-family: 'Cascadia Code', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+  }
+
+  .terminal-window {
+    margin: 16px;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #161b22;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    height: calc(100% - 32px);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .title-bar {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    background: #21262d;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .title-bar .dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+  }
+  .dot.red { background: #ff5f57; }
+  .dot.yellow { background: #febc2e; }
+  .dot.green { background: #28c840; }
+
+  .title-bar .title {
+    flex: 1;
+    text-align: center;
+    color: #8b949e;
+    font-size: 13px;
+    margin-right: 52px; /* offset for dots */
+  }
+
+  .terminal-body {
+    padding: 16px 20px;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .line {
+    font-size: 14px;
+    line-height: 1.7;
+    white-space: pre;
+    color: #e6edf3;
+    min-height: 1.7em;
+  }
+
+  .prompt { color: #7ee787; }
+  .command { color: #e6edf3; }
+  .cursor {
+    display: inline-block;
+    width: 8px;
+    height: 16px;
+    background: #e6edf3;
+    vertical-align: text-bottom;
+    animation: blink 1s step-end infinite;
+  }
+
+  @keyframes blink {
+    50% { opacity: 0; }
+  }
+
+  /* Output color classes */
+  .green { color: #7ee787; }
+  .red { color: #f85149; }
+  .yellow { color: #d29922; }
+  .cyan { color: #79c0ff; }
+  .purple { color: #d2a8ff; }
+  .dim { color: #8b949e; }
+  .bold { font-weight: 700; }
+  .white { color: #e6edf3; }
+</style>
+</head>
+<body>
+
+<div class="terminal-window">
+  <div class="title-bar">
+    <div class="dot red"></div>
+    <div class="dot yellow"></div>
+    <div class="dot green"></div>
+    <div class="title" id="windowTitle">pytest</div>
+  </div>
+  <div class="terminal-body" id="terminal"></div>
+</div>
+
+<script>
+// ============================================================
+// CONFIGURABLE DATA — Modify this section for each animation
+// ============================================================
+
+const WINDOW_TITLE = 'pytest';
+const PROMPT_TEXT = '$ ';
+const COMMAND_TEXT = 'pytest tests/ -v';
+
+// Each line: { text, classes (CSS classes), delay (ms before showing) }
+const OUTPUT_LINES = [
+  { text: '================================ test session starts ================================', classes: 'bold white', delay: 400 },
+  { text: 'platform linux -- Python 3.12.1, pytest-8.0.0', classes: 'dim', delay: 80 },
+  { text: 'collected 3 items', classes: 'bold white', delay: 200 },
+  { text: '', classes: '', delay: 100 },
+  { text: 'tests/test_core.py::test_parse_input PASSED', classes: 'green', delay: 300 },
+  { text: 'tests/test_core.py::test_validate_output PASSED', classes: 'green', delay: 300 },
+  { text: 'tests/test_core.py::test_edge_cases PASSED', classes: 'green', delay: 300 },
+  { text: '', classes: '', delay: 100 },
+  { text: '================================= 3 passed in 0.42s =================================', classes: 'bold green', delay: 200 },
+];
+
+// Timing
+const TYPING_SPEED = 60;       // ms per character when typing command
+const INITIAL_DELAY = 500;     // ms before typing starts
+const POST_COMMAND_DELAY = 600; // ms after command before output starts
+const POST_ANIMATION_DELAY = 1500; // ms to hold after last line before signaling done
+
+// ============================================================
+// ANIMATION ENGINE — Do not modify below
+// ============================================================
+
+const terminal = document.getElementById('terminal');
+if (!terminal) {
+  console.error('Terminal element not found');
+  document.title = 'ANIMATION_DONE';
+  throw new Error('Terminal element #terminal not found');
+}
+
+function createLine() {
+  const div = document.createElement('div');
+  div.className = 'line';
+  terminal.appendChild(div);
+  return div;
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function typeText(element, text, className, speed) {
+  const span = document.createElement('span');
+  if (className) span.className = className;
+  element.appendChild(span);
+
+  const cursor = document.createElement('span');
+  cursor.className = 'cursor';
+  element.appendChild(cursor);
+
+  for (let i = 0; i < text.length; i++) {
+    span.textContent += text[i];
+    await sleep(speed);
+  }
+
+  cursor.remove();
+}
+
+async function showOutputLine(text, classes) {
+  const line = createLine();
+  if (classes) {
+    const span = document.createElement('span');
+    span.className = classes;
+    span.textContent = text;
+    line.appendChild(span);
+  } else {
+    line.textContent = text;
+  }
+}
+
+async function runAnimation() {
+  await sleep(INITIAL_DELAY);
+
+  // Create the command line
+  const cmdLine = createLine();
+
+  // Add prompt
+  const promptSpan = document.createElement('span');
+  promptSpan.className = 'prompt';
+  promptSpan.textContent = PROMPT_TEXT;
+  cmdLine.appendChild(promptSpan);
+
+  // Type the command
+  await typeText(cmdLine, COMMAND_TEXT, 'command', TYPING_SPEED);
+
+  await sleep(POST_COMMAND_DELAY);
+
+  // Show output lines with delays
+  for (const line of OUTPUT_LINES) {
+    await sleep(line.delay);
+    await showOutputLine(line.text, line.classes);
+  }
+
+  // Hold the final frame
+  await sleep(POST_ANIMATION_DELAY);
+
+  // Signal completion
+  document.title = 'ANIMATION_DONE';
+}
+
+runAnimation().catch(err => {
+  console.error('Animation error:', err);
+  document.title = 'ANIMATION_DONE';
+});
+</script>
+
+</body>
+</html>
