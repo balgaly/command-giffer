@@ -1,5 +1,8 @@
 # command-giffer
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
+[![Claude Code](https://img.shields.io/badge/Built%20with-Claude%20Code-blueviolet)](https://docs.anthropic.com/en/docs/claude-code)
+
 Create animated terminal demo GIFs for GitHub READMEs with a single command. Describe what the terminal should show in natural language and get a polished GIF.
 
 ![Demo](./demo.gif)
