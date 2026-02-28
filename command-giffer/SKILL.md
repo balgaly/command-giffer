@@ -6,12 +6,13 @@ description: >
   Use when user says "create demo gif", "terminal animation", "readme gif",
   "record terminal demo", "make a gif for my readme", or invokes /command-giffer.
 license: MIT
-allowed-tools: Bash, Read, Write, Glob, Grep, mcp__playwright__browser_run_code, mcp__playwright__browser_navigate, mcp__playwright__browser_snapshot, mcp__playwright__browser_close, mcp__playwright__browser_wait_for, mcp__playwright__browser_tabs, mcp__playwright__browser_install
+compatibility: Requires Playwright MCP server, ffmpeg in PATH, and Python 3 for HTTP server.
+allowed-tools: Bash Read Write Glob Grep mcp__playwright__browser_run_code mcp__playwright__browser_navigate mcp__playwright__browser_snapshot mcp__playwright__browser_close mcp__playwright__browser_wait_for mcp__playwright__browser_tabs mcp__playwright__browser_install
 argument-hint: "<description of terminal demo>" [--output path/to/output.gif] [--width 820] [--height 400] [--title "Window Title"]
 metadata:
-  author: Snir Balgaly
+  author: "Snir Balgaly"
   version: "1.0.0"
-  tags: gif, terminal, demo, readme, animation
+  tags: "gif, terminal, demo, readme, animation"
 ---
 
 # command-giffer
@@ -20,15 +21,15 @@ Generate animated terminal demo GIFs from natural language descriptions.
 
 ## Step 1: Parse Input
 
-Parse the user's arguments to extract:
+Parse `$ARGUMENTS` to extract:
 
-- **description**: The natural language description of what the terminal should show (required, the main argument text)
+- **description**: The natural language description of what the terminal should show (the main positional text in `$ARGUMENTS`)
 - **--output**: Output GIF path (default: `demo.gif` in the current working directory)
 - **--width**: Terminal viewport width in pixels (default: `820`)
 - **--height**: Terminal viewport height in pixels (default: `400`)
 - **--title**: Terminal window title (auto-derived from the command if not specified)
 
-If the description is empty or missing, ask the user what they want the terminal to show.
+If `$ARGUMENTS` is empty or contains no description, ask the user what they want the terminal to show.
 
 ## Step 2: Design the Animation
 
@@ -187,16 +188,15 @@ async (page) => {
   const browser = page.context().browser();
   const context = await browser.newContext({
     viewport: { width: WIDTH, height: HEIGHT },
-    deviceScaleFactor: 2,
     recordVideo: {
       dir: 'TMPDIR_PATH',
-      size: { width: WIDTH * 2, height: HEIGHT * 2 }
+      size: { width: WIDTH, height: HEIGHT }
     }
   });
   const recPage = await context.newPage();
   await recPage.goto('http://127.0.0.1:PORT/animation.html');
   await recPage.waitForFunction(() => document.title === 'ANIMATION_DONE', null, { timeout: 30000 });
-  await recPage.waitForTimeout(500);
+  await recPage.waitForTimeout(1000);
   await context.close();
   return 'Recording complete';
 }
@@ -204,12 +204,12 @@ async (page) => {
 
 **Important notes:**
 - **Use `page.context().browser()`** to access the existing browser instance — `require('playwright')` is not available in the MCP execution context
-- `deviceScaleFactor: 2` records at 2x resolution for crisp text
-- `recordVideo.size` should be `width * 2` and `height * 2` to match the 2x scale
+- **Do NOT use `deviceScaleFactor: 2`** — it causes grey artifacts in the VP8 video encoding. Record at 1x; the output is sharp at native resolution.
+- `recordVideo.size` should match `viewport` dimensions exactly
 - Use forward slashes in `TMPDIR_PATH` even on Windows (for JS string)
 - Escape backslashes if on Windows: replace `\` with `/` in the path
 - Wait for `ANIMATION_DONE` title which the animation engine sets when done
-- The extra `waitForTimeout(500)` ensures the last frame is captured
+- The extra `waitForTimeout(1000)` ensures the last frame is captured
 - `context.close()` finalizes the video file — do NOT call `browser.close()` as the browser is shared with the MCP server
 
 After recording, find the video file:
@@ -245,7 +245,7 @@ ffmpeg -i "$WEBM_FILE" -vf "fps=15,scale=WIDTH:-1:flags=lanczos,palettegen=max_c
 ffmpeg -i "$WEBM_FILE" -i "$PALETTE" -lavfi "fps=15,scale=WIDTH:-1:flags=lanczos[x];[x][1:v]paletteuse=dither=floyd_steinberg:diff_mode=rectangle" -y "$OUTPUT_PATH"
 ```
 
-Where `WIDTH` is the `--width` value from Step 1 (not the 2x recording size — ffmpeg scales down for the final output).
+Where `WIDTH` is the `--width` value from Step 1 (matching the recording viewport).
 
 If the GIF is larger than 5MB, retry with `max_colors=64` and `fps=12`.
 
